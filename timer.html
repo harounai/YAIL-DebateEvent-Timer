@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YAIL Debate Timer — AI in Higher Education</title>
+  <style>
+    :root {
+      --navy:   #1B2A4A;
+      --navy2:  #111e35;
+      --yellow: #F5C842;
+      --white:  #FFFFFF;
+      --prop:   #27AE60;
+      --opp:    #E74C3C;
+      --warn:   #F39C12;
+      --dim:    rgba(255,255,255,0.45);
+      --sub:    rgba(255,255,255,0.06);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Arial Black', Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+      /* Subtle dot-grid texture — poster-inspired */
+      background-image: radial-gradient(rgba(245,200,66,0.045) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    /* ══ HEADER ════════════════════════════════════════════════ */
+    header {
+      background: #FFFFFF;
+      border-bottom: 4px solid var(--yellow);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      position: relative;
+      min-height: 116px;
+    }
+
+    /* YAIL — dominant left anchor, bigger */
+    .header-yail {
+      flex-shrink: 0;
+      z-index: 1;
+    }
+    .header-yail img {
+      height: 110px;
+      display: block;
+    }
+
+    /* divider between YAIL and motion */
+    .h-sep {
+      width: 1px;
+      height: 62px;
+      background: rgba(27,42,74,0.15);
+      flex-shrink: 0;
+      margin: 0 20px;
+      z-index: 1;
+    }
+
+    /* Motion text — truly dead-centre of the full header */
+    .header-motion {
+      position: absolute;
+      left: 0;
+      right: 0;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .motion-overline {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(27,42,74,0.5);
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    .motion-main {
+      font-size: 14px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: rgba(27,42,74,0.7);
+      margin-bottom: 6px;
+    }
+
+    /* Yellow pill — poster style */
+    .motion-pill {
+      display: inline-block;
+      background: var(--navy);
+      color: var(--yellow);
+      padding: 7px 24px;
+      border-radius: 100px;
+      font-size: 17px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Right: clock + fullscreen — pushed to end */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      margin-left: auto;
+      z-index: 1;
+    }
+
+    .live-clock {
+      font-family: 'Courier New', monospace;
+      font-size: 26px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      color: var(--navy);
+    }
+
+    .fs-btn {
+      background: none;
+      border: 1px solid rgba(27,42,74,0.2);
+      color: rgba(27,42,74,0.4);
+      padding: 5px 11px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: color .2s, border-color .2s;
+    }
+    .fs-btn:hover { color: var(--navy); border-color: var(--navy); }
+
+    /* ══ MAIN ══════════════════════════════════════════════════ */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 310px 1fr;
+      min-height: 0;
+    }
+
+    /* ══ SPEAKER PANEL ═════════════════════════════════════════ */
+    .speaker-panel {
+      background: var(--navy2);
+      border-right: 5px solid var(--prop);
+      border-left: 5px solid var(--prop);
+      padding: 20px 18px 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: border-left-color 0.4s, border-right-color 0.4s;
+      position: relative;
+    }
+
+    /* Large faded slot watermark — poster-style big text */
+    .slot-watermark {
+      position: absolute;
+      bottom: 60px;
+      right: 10px;
+      font-size: 110px;
+      font-weight: 900;
+      opacity: 0.04;
+      color: var(--yellow);
+      letter-spacing: -4px;
+      pointer-events: none;
+      line-height: 1;
+    }
+
+    /* Progress dots */
+    .sp-dots {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 16px;
+    }
+
+    .sp-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      transition: background .25s, transform .25s, opacity .25s;
+    }
+    .sp-dot.done    { opacity: 0.38; }
+    .sp-dot.current { transform: scale(1.5); }
+    .sp-dot.prop    { background: var(--prop); }
+    .sp-dot.opp     { background: var(--opp); }
+
+    .sp-counter {
+      margin-left: auto;
+      font-family: Arial, sans-serif;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--dim);
+    }
+
+    /* Side badge */
+    .side-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      border-radius: 7px;
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      transition: background .4s, border-color .4s, color .4s;
+    }
+    .side-badge.proposition {
+      background: rgba(39,174,96,0.13);
+      border: 1px solid rgba(39,174,96,0.4);
+      color: #5cdb8a;
+    }
+    .side-badge.opposition {
+      background: rgba(231,76,60,0.13);
+      border: 1px solid rgba(231,76,60,0.4);
+      color: #f07060;
+    }
+    .side-icon { font-size: 15px; }
+
+    .speaker-slot {
+      font-size: 12px;
+      letter-spacing: 3.5px;
+      text-transform: uppercase;
+      color: var(--yellow);
+      font-weight: 900;
+      margin-bottom: 7px;
+    }
+
+    .speaker-name {
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1.15;
+      margin-bottom: 9px;
+    }
+
+    .speaker-affiliation {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: bold;
+      color: var(--dim);
+      line-height: 1.6;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      margin-bottom: 14px;
+    }
+
+    .upcoming-label {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.32);
+      margin-bottom: 9px;
+    }
+
+    .upcoming-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      border-radius: 6px;
+      background: var(--sub);
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: bold;
+      color: rgba(255,255,255,0.65);
+    }
+
+    .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .dot.prop { background: var(--prop); }
+    .dot.opp  { background: var(--opp); }
+
+    .upc-slot {
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .nav-row {
+      display: flex;
+      gap: 10px;
+      margin-top: auto;
+      padding-top: 12px;
+    }
+
+    .nav-btn {
+      flex: 1;
+      padding: 13px 6px;
+      background: rgba(245,200,66,0.07);
+      border: 1px solid rgba(245,200,66,0.28);
+      color: var(--yellow);
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .nav-btn:hover:not(:disabled) { background: rgba(245,200,66,0.18); }
+    .nav-btn:disabled { opacity: 0.18; cursor: not-allowed; }
+
+    /* kbd-hint removed */
+
+    /* ══ TIMER PANEL ═══════════════════════════════════════════ */
+    .timer-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 18px 60px;
+      gap: 18px;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.7s;
+    }
+
+    /* Poster-inspired decorative arcs — bottom right */
+    .deco-arcs {
+      position: absolute;
+      bottom: -30px;
+      right: -30px;
+      pointer-events: none;
+      opacity: 1;
+    }
+
+    /* Large YES/NO watermark — changes with speaker side */
+    .yn-watermark {
+      position: absolute;
+      font-size: 220px;
+      font-weight: 900;
+      opacity: 0.032;
+      pointer-events: none;
+      letter-spacing: -8px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -52%);
+      transition: color 0.5s, opacity 0.5s;
+      color: var(--yellow);
+    }
+    .yn-watermark.prop { color: var(--prop); }
+    .yn-watermark.opp  { color: var(--opp); }
+
+    /* Decorative top-left dots cluster */
+    .deco-dots {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      pointer-events: none;
+      opacity: 0.55;
+    }
+
+    .timer-panel.state-warn {
+      background: radial-gradient(ellipse at center, rgba(243,156,18,0.07) 0%, transparent 68%);
+    }
+    .timer-panel.state-over {
+      background: radial-gradient(ellipse at center, rgba(231,76,60,0.12) 0%, transparent 68%);
+    }
+
+    .timer-label {
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--dim);
+      position: relative;
+      z-index: 1;
+    }
+    .timer-label.overtime-label { color: var(--opp); opacity: 0.9; }
+
+    .timer-display {
+      font-family: 'Courier New', monospace;
+      font-size: clamp(90px, 13vw, 158px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -2px;
+      transition: color .35s, text-shadow .35s;
+      position: relative;
+      z-index: 1;
+    }
+    .timer-display.state-ok {
+      color: var(--white);
+      text-shadow: 0 0 70px rgba(255,255,255,0.05);
+    }
+    .timer-display.state-warn {
+      color: var(--warn);
+      text-shadow: 0 0 70px rgba(243,156,18,0.3);
+    }
+    .timer-display.state-over {
+      color: var(--opp);
+      text-shadow: 0 0 70px rgba(231,76,60,0.45);
+      animation: flash 0.85s ease-in-out infinite;
+    }
+
+    @keyframes flash {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.25; }
+    }
+
+    /* ── Progress bar (left→right, draggable) ── */
+    .progress-wrap {
+      width: 100%;
+      max-width: 580px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .progress-milestones {
+      position: relative;
+      height: 18px;
+      margin-bottom: 8px;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      font-weight: bold;
+      color: rgba(255,255,255,0.35);
+    }
+    .m-start { position: absolute; left: 0; }
+    .m-warn  { position: absolute; left: 80%; transform: translateX(-50%); color: var(--warn); opacity: 0.8; }
+    .m-end   { position: absolute; right: 0; }
+
+    .progress-track {
+      height: 14px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 7px;
+      position: relative;
+      cursor: pointer;
+    }
+    .progress-track:hover .progress-thumb { opacity: 1; transform: translateY(-50%) scale(1.15); }
+
+    .warn-marker {
+      position: absolute;
+      left: 80%;
+      top: -4px;
+      width: 2px;
+      height: 22px;
+      background: var(--warn);
+      border-radius: 1px;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 7px;
+      transition: background .4s;
+      background: var(--yellow);
+      position: relative;
+      pointer-events: none;
+    }
+    .progress-fill.warn { background: var(--warn); }
+    .progress-fill.over { background: var(--opp); }
+
+    .progress-thumb {
+      position: absolute;
+      right: -9px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px; height: 18px;
+      background: var(--white);
+      border-radius: 50%;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.55);
+      opacity: 0.55;
+      transition: opacity .2s, transform .15s;
+      pointer-events: none;
+    }
+    .progress-track.dragging .progress-thumb {
+      opacity: 1;
+      transform: translateY(-50%) scale(1.2);
+    }
+
+    /* Controls */
+    .controls { display: flex; gap: 14px; position: relative; z-index: 1; }
+
+    .btn {
+      padding: 13px 36px;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: transform .1s, filter .15s, box-shadow .2s;
+    }
+    .btn:active { transform: scale(0.96); }
+
+    .btn-primary {
+      background: var(--yellow);
+      color: var(--navy2);
+      min-width: 158px;
+      box-shadow: 0 4px 22px rgba(245,200,66,0.22);
+    }
+    .btn-primary:hover { box-shadow: 0 4px 30px rgba(245,200,66,0.4); filter: brightness(1.06); }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.07);
+      color: var(--white);
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.13); }
+
+    /* bell-row removed */
+
+    /* ══ FOOTER ════════════════════════════════════════════════ */
+    footer {
+      background: #fff;
+      border-top: 3px solid var(--yellow);
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      height: 76px;
+    }
+
+    .f-side {
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+    .f-side.right { justify-content: flex-end; }
+
+    .f-side img { object-fit: contain; display: block; }
+
+    .f-center {
+      text-align: center;
+      padding: 0 20px;
+    }
+    .f-title {
+      font-size: 15px;
+      font-weight: 900;
+      color: #1B2A4A;
+    }
+    .f-sub {
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      font-weight: bold;
+      color: #888;
+      margin-top: 3px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════════ -->
+<header>
+  <!-- YAIL — dominant brand anchor, top left -->
+  <div class="header-yail">
+    <img src="AI in Education Debate - Meet team/Logos/Linz Hub- Coloured Logo.png"
+         alt="Young AI Leaders Community Linz">
+  </div>
+
+  <div class="h-sep"></div>
+
+  <!-- Motion — centred, poster-style pill -->
+  <div class="header-motion">
+    <div class="motion-overline">The Motion</div>
+    <div class="motion-main">This House Believes That</div>
+    <div class="motion-pill">AI Should Never Be Used in Higher Education</div>
+  </div>
+
+  <!-- Clock & fullscreen -->
+  <div class="header-right">
+    <div class="live-clock" id="live-clock">00:00:00</div>
+    <button class="fs-btn" onclick="toggleFullscreen()" title="Fullscreen (F)">⛶</button>
+  </div>
+</header>
+
+<!-- ══ MAIN ════════════════════════════════════════════════════ -->
+<main>
+
+  <!-- ── Speaker Panel ── -->
+  <div class="speaker-panel" id="speaker-panel">
+
+    <!-- Large slot watermark -->
+    <div class="slot-watermark" id="slot-watermark">P1</div>
+
+    <!-- Progress dots -->
+    <div class="sp-dots" id="sp-dots">
+      <div class="sp-dot"></div>
+      <div class="sp-dot"></div>
+      <div class="sp-dot"></div>
+      <div class="sp-dot"></div>
+      <div class="sp-dot"></div>
+      <div class="sp-dot"></div>
+      <span class="sp-counter" id="sp-counter">1 of 6</span>
+    </div>
+
+    <div class="side-badge proposition" id="side-badge">
+      <span class="side-icon" id="side-icon">✓</span>
+      <span id="side-text">YES — Proposition</span>
+    </div>
+
+    <div class="speaker-slot"        id="speaker-slot">P1</div>
+    <div class="speaker-name"        id="speaker-name">Dr. Erich Kobler</div>
+    <div class="speaker-affiliation" id="speaker-affiliation">JKU Institute for Machine Learning; FWF BilAI</div>
+
+    <div class="upcoming-label">Up next</div>
+    <div id="upcoming-list"></div>
+
+    <div class="nav-row">
+      <button class="nav-btn" id="prev-btn" onclick="prevSpeaker()">← Prev</button>
+      <button class="nav-btn" id="next-btn" onclick="nextSpeaker()">Next →</button>
+    </div>
+
+  </div>
+
+  <!-- ── Timer Panel ── -->
+  <div class="timer-panel" id="timer-panel">
+
+    <!-- Decorative: YES/NO watermark (poster-inspired) -->
+    <div class="yn-watermark prop" id="yn-watermark">YES</div>
+
+    <!-- Decorative: concentric dashed arcs — poster corner motif -->
+    <svg class="deco-arcs" width="240" height="240" viewBox="0 0 240 240">
+      <circle cx="240" cy="240" r="70"  fill="none" stroke="rgba(245,200,66,0.07)" stroke-width="1.5" stroke-dasharray="5 9"/>
+      <circle cx="240" cy="240" r="105" fill="none" stroke="rgba(245,200,66,0.05)" stroke-width="1.5" stroke-dasharray="4 12"/>
+      <circle cx="240" cy="240" r="140" fill="none" stroke="rgba(245,200,66,0.035)" stroke-width="1" stroke-dasharray="3 14"/>
+      <circle cx="240" cy="240" r="175" fill="none" stroke="rgba(245,200,66,0.025)" stroke-width="1" stroke-dasharray="2 16"/>
+    </svg>
+
+    <!-- Decorative: YAIL-style coloured dot cluster top-left -->
+    <svg class="deco-dots" width="56" height="56" viewBox="0 0 56 56">
+      <circle cx="8"  cy="8"  r="4" fill="rgba(245,200,66,0.5)"/>
+      <circle cx="22" cy="8"  r="4" fill="rgba(39,174,96,0.5)"/>
+      <circle cx="36" cy="8"  r="4" fill="rgba(33,150,243,0.5)"/>
+      <circle cx="8"  cy="22" r="4" fill="rgba(233,30,99,0.5)"/>
+      <circle cx="22" cy="22" r="4" fill="rgba(255,87,34,0.5)"/>
+      <circle cx="36" cy="22" r="4" fill="rgba(156,39,176,0.5)"/>
+      <circle cx="8"  cy="36" r="4" fill="rgba(0,188,212,0.5)"/>
+      <circle cx="22" cy="36" r="4" fill="rgba(139,195,74,0.5)"/>
+      <circle cx="36" cy="36" r="4" fill="rgba(255,152,0,0.5)"/>
+    </svg>
+
+    <div class="timer-label" id="timer-label">Time Remaining</div>
+    <div class="timer-display state-ok" id="timer-display">05:00</div>
+
+    <!-- Progress bar — left to right, draggable -->
+    <div class="progress-wrap">
+      <div class="progress-milestones">
+        <span class="m-start">0:00</span>
+        <span class="m-warn">⚠ 4:00</span>
+        <span class="m-end">5:00!</span>
+      </div>
+      <div class="progress-track" id="progress-track">
+        <div class="warn-marker"></div>
+        <div class="progress-fill" id="progress-fill" style="width:0%">
+          <div class="progress-thumb"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary"   id="start-btn" onclick="toggleTimer()">▶ Start</button>
+      <button class="btn btn-secondary"                onclick="resetTimer()">↺ Reset</button>
+    </div>
+
+
+  </div>
+</main>
+
+<!-- ══ FOOTER ══════════════════════════════════════════════════ -->
+<footer>
+  <!-- KIC — left -->
+  <div class="f-side left">
+    <img src="AI in Education Debate - Meet team/Logos/KIC-LogoFullH-RGB.png"
+         alt="Knowledge in Crisis — An FWF Cluster of Excellence" height="44">
+  </div>
+
+  <!-- Event info — centre -->
+  <div class="f-center">
+    <div class="f-title">AI in Higher Education Showcase Debate</div>
+    <div class="f-sub">22 October 2026 &nbsp;·&nbsp; JKU - Zirkus des Wissens &nbsp;·&nbsp; Young AI Leaders Linz </div>
+  </div>
+
+  <!-- TeamViewer — right -->
+  <div class="f-side right">
+    <img src="AI in Education Debate - Meet team/Logos/TeamViewer-logo.png"
+         alt="TeamViewer" height="30">
+  </div>
+</footer>
+
+<script>
+  // ── DATA ──────────────────────────────────────────────────────
+  const speakers = [
+    { slot:"P1", name:"Dr. Erich Kobler",       affiliation:"JKU Institute for Machine Learning; FWF BilAI",  side:"proposition" },
+    { slot:"O1", name:"Anamaria-Roberta Hartl", affiliation:"JKU Institute for Machine Learning; FWF BilAI",  side:"opposition"  },
+    { slot:"P2", name:"Sarah Hinteregger",       affiliation:"MA Philosophy Student, CEU",                     side:"proposition" },
+    { slot:"O2", name:"Tamas Klement",           affiliation:"BA Data Science & Society Student, CEU",         side:"opposition"  },
+    { slot:"P3", name:"Dr. Tim Crane",           affiliation:"CEU; FWF Knowledge in Crisis",                   side:"proposition" },
+    { slot:"O3", name:"Bram van Haver",          affiliation:"UNESCO, Youth for Peace programme",              side:"opposition"  },
+  ];
+
+  const TOTAL        = 5 * 60;   // 300 s normal time
+  const WARN_AT      = 4 * 60;   // 240 s — warning bell
+  const OVERTIME_MAX = TOTAL + 60; // 360 s — stop at -1:00
+
+  let idx           = 0;
+  let elapsed       = 0;
+  let running       = false;
+  let ticker        = null;
+  let warnFired     = false;
+  let stopFired     = false;
+  let firedOvertime = new Set(); // tracks {10,20,30,40,50,60}
+  let audioCtx      = null;
+
+  // ── AUDIO ─────────────────────────────────────────────────────
+  function audio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  function tone(freq, dur, offset = 0, vol = 0.6) {
+    const ctx  = audio();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const t = ctx.currentTime + offset;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+  }
+
+  function shortBell() { tone(880, 0.45); }
+
+  function longBell() {           // three-bell Oxford toll
+    tone(660, 0.7, 0.0);
+    tone(660, 0.7, 0.85);
+    tone(660, 1.1, 1.7);
+  }
+
+  function overtimePing() { tone(740, 0.3, 0, 0.5); } // softer overtime beep
+
+  // ── CLOCK ─────────────────────────────────────────────────────
+  function updateClock() {
+    document.getElementById('live-clock').textContent =
+      new Date().toLocaleTimeString('de-AT', { hour12: false });
+  }
+
+  // ── FORMAT ────────────────────────────────────────────────────
+  function fmt(elapsedSec) {
+    if (elapsedSec <= TOTAL) {
+      const rem = TOTAL - elapsedSec;
+      return `${String(Math.floor(rem / 60)).padStart(2,'0')}:${String(rem % 60).padStart(2,'0')}`;
+    } else {
+      const over = Math.min(elapsedSec - TOTAL, 60);
+      return `-${Math.floor(over / 60)}:${String(over % 60).padStart(2,'0')}`;
+    }
+  }
+
+  // ── RENDER ────────────────────────────────────────────────────
+  function render() {
+    const disp  = document.getElementById('timer-display');
+    const fill  = document.getElementById('progress-fill');
+    const panel = document.getElementById('timer-panel');
+    const label = document.getElementById('timer-label');
+
+    disp.textContent = fmt(elapsed);
+
+    // Progress bar: 0–TOTAL only, capped at 100%
+    const pct = Math.min((elapsed / TOTAL) * 100, 100);
+    fill.style.width = pct + '%';
+
+    if (elapsed >= TOTAL) {
+      // OVERTIME — always red + flashing
+      disp.className  = 'timer-display state-over';
+      fill.className  = 'progress-fill over';
+      panel.className = 'timer-panel state-over';
+      label.textContent = 'Overtime';
+      label.className   = 'timer-label overtime-label';
+    } else if (elapsed >= WARN_AT) {
+      disp.className  = 'timer-display state-warn';
+      fill.className  = 'progress-fill warn';
+      panel.className = 'timer-panel state-warn';
+      label.textContent = 'Time Remaining';
+      label.className   = 'timer-label';
+    } else {
+      disp.className  = 'timer-display state-ok';
+      fill.className  = 'progress-fill';
+      panel.className = 'timer-panel';
+      label.textContent = 'Time Remaining';
+      label.className   = 'timer-label';
+    }
+  }
+
+  // ── BELL LOGIC (called only during live play, not during drag) ─
+  function checkBells() {
+    if (elapsed === WARN_AT && !warnFired) {
+      warnFired = true;
+      shortBell();
+    }
+
+    if (elapsed === TOTAL && !stopFired) {
+      stopFired = true;
+      longBell();
+    }
+
+    if (elapsed > TOTAL) {
+      const over = elapsed - TOTAL;
+      if (over % 10 === 0 && over <= 60 && !firedOvertime.has(over)) {
+        firedOvertime.add(over);
+        overtimePing();
+      }
+    }
+  }
+
+  // ── CONTROLS ──────────────────────────────────────────────────
+  function toggleTimer() { running ? pauseTimer() : startTimer(); }
+
+  function startTimer() {
+    if (running) return;
+    if (elapsed >= OVERTIME_MAX) return; // already expired
+    audio();
+    running = true;
+    document.getElementById('start-btn').textContent = '⏸ Pause';
+    ticker = setInterval(() => {
+      elapsed++;
+      render();
+      checkBells();
+      if (elapsed >= OVERTIME_MAX) pauseTimer();
+    }, 1000);
+  }
+
+  function pauseTimer() {
+    running = false;
+    clearInterval(ticker);
+    document.getElementById('start-btn').textContent =
+      elapsed >= OVERTIME_MAX ? '⏺ Expired' : '▶ Resume';
+  }
+
+  function resetTimer() {
+    pauseTimer();
+    elapsed = 0; warnFired = false; stopFired = false;
+    firedOvertime.clear();
+    document.getElementById('start-btn').textContent = '▶ Start';
+    render();
+  }
+
+  // ── DRAGGABLE PROGRESS BAR ────────────────────────────────────
+  const track = document.getElementById('progress-track');
+  let dragging   = false;
+  let wasRunning = false;
+
+  function seekTo(clientX) {
+    const rect = track.getBoundingClientRect();
+    const pct  = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    elapsed = Math.round(pct * TOTAL); // bar covers 0–TOTAL only
+
+    // Pre-mark bells to avoid re-firing on resume
+    warnFired = elapsed >= WARN_AT;
+    stopFired = elapsed >= TOTAL;
+
+    firedOvertime.clear();
+    if (elapsed >= TOTAL) {
+      const over = elapsed - TOTAL;
+      for (let t = 10; t <= over && t <= 60; t += 10) firedOvertime.add(t);
+    }
+
+    render();
+  }
+
+  track.addEventListener('mousedown', e => {
+    dragging = true; wasRunning = running;
+    if (running) pauseTimer();
+    track.classList.add('dragging');
+    seekTo(e.clientX);
+  });
+  document.addEventListener('mousemove', e => { if (dragging) seekTo(e.clientX); });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    track.classList.remove('dragging');
+    if (wasRunning) startTimer();
+  });
+
+  track.addEventListener('touchstart', e => {
+    dragging = true; wasRunning = running;
+    if (running) pauseTimer();
+    track.classList.add('dragging');
+    seekTo(e.touches[0].clientX);
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (dragging) seekTo(e.touches[0].clientX);
+  }, { passive: true });
+  document.addEventListener('touchend', () => {
+    if (!dragging) return;
+    dragging = false;
+    track.classList.remove('dragging');
+    if (wasRunning) startTimer();
+  });
+
+  // ── SPEAKER NAV ───────────────────────────────────────────────
+  function loadSpeaker() {
+    const sp   = speakers[idx];
+    const prop = sp.side === 'proposition';
+
+    // Left + right border accent
+    const panelEl = document.getElementById('speaker-panel');
+    const accentColor = prop ? 'var(--prop)' : 'var(--opp)';
+    panelEl.style.borderLeftColor  = accentColor;
+    panelEl.style.borderRightColor = accentColor;
+    const badge = document.getElementById('side-badge');
+    badge.className = 'side-badge ' + sp.side;
+    document.getElementById('side-icon').textContent = prop ? '✓' : '✗';
+    document.getElementById('side-text').textContent = prop ? 'YES — Proposition' : 'NO — Opposition';
+
+    // Text details
+    document.getElementById('speaker-slot').textContent        = sp.slot;
+    document.getElementById('speaker-name').textContent        = sp.name;
+    document.getElementById('speaker-affiliation').textContent = sp.affiliation;
+    document.getElementById('sp-counter').textContent          = `${idx + 1} of ${speakers.length}`;
+    document.getElementById('slot-watermark').textContent      = sp.slot;
+    document.getElementById('prev-btn').disabled = idx === 0;
+    document.getElementById('next-btn').disabled = idx === speakers.length - 1;
+
+    // YES/NO watermark
+    const ynEl = document.getElementById('yn-watermark');
+    ynEl.textContent = prop ? 'YES' : 'NO';
+    ynEl.className   = 'yn-watermark ' + (prop ? 'prop' : 'opp');
+
+    // Progress dots
+    document.querySelectorAll('.sp-dot').forEach((dot, i) => {
+      dot.className = 'sp-dot';
+      if      (i < idx)   dot.classList.add('done',    speakers[i].side === 'proposition' ? 'prop' : 'opp');
+      else if (i === idx) dot.classList.add('current', prop ? 'prop' : 'opp');
+    });
+
+    // Upcoming list
+    const list = document.getElementById('upcoming-list');
+    list.innerHTML = '';
+    speakers.slice(idx + 1, idx + 4).forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'upcoming-item';
+      row.innerHTML = `
+        <div class="dot ${s.side === 'proposition' ? 'prop' : 'opp'}"></div>
+        <span class="upc-slot">${s.slot}</span>
+        <span>${s.name}</span>`;
+      list.appendChild(row);
+    });
+  }
+
+  function prevSpeaker() { if (idx > 0)                   { idx--; loadSpeaker(); resetTimer(); } }
+  function nextSpeaker() { if (idx < speakers.length - 1) { idx++; loadSpeaker(); resetTimer(); } }
+
+  // ── FULLSCREEN ────────────────────────────────────────────────
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  }
+
+  // ── KEYBOARD ──────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
+    if (e.code === 'KeyR')  resetTimer();
+    if (e.code === 'KeyN')  nextSpeaker();
+    if (e.code === 'KeyP')  prevSpeaker();
+    if (e.code === 'KeyF')  toggleFullscreen();
+  });
+
+  // ── INIT ──────────────────────────────────────────────────────
+  loadSpeaker();
+  render();
+  updateClock();
+  setInterval(updateClock, 1000);
+</script>
+</body>
+</html>
